@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="3d1d9baf-b945-4b4f-8bf3-6738baa02b61" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/../FitManager_Java_Version1/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../FitManager_Java_Version1/src/main/java/org/example/CompteBancaire.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../FitManager_Java_Version1/src/main/java/org/example/Personne.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../FitManager_Java_Version1/src/main/java/org/example/Produit.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../FitManager_Java_Version1/src/main/java/org/example/test.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/.idea/testVue.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/java/.idea/java.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/javav.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/src/Payable.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/src/Product.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/src/Student.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/src/User.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../testVue/javav/src/dbExemple.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Among Us.lnk" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Antigravity.lnk" beforeDir="false" afterPath="$PROJECT_DIR$/../Antigravity.lnk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../BuyMatch-" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ClassDiagram1.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Discord.lnk" beforeDir="false" afterPath="$PROJECT_DIR$/../Discord.lnk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../SkillSwap_FilRouge" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Untitled.mdj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Untitled1.mdj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UseCaseDiagram1.jpg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../UseCaseDiagram1.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/.env" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/AdminController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/AuthController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/CommentController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/MatchController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/OrganizerController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/TicketController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Controllers/UserController.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Controller.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Model.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Request.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Response.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Router.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Core/Session.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Helpers/redirect.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Helpers/validator.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Helpers/view.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Middleware/AdminMiddleware.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Middleware/AuthMiddleware.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Middleware/OrganizerMiddleware.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Admin.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Category.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Comment.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Match.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Organizer.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Rating.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Team.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/Ticket.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Models/User.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Services/MatchService.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Services/RatingService.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Services/TicketService.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/auth/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/dashboard/admin/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/dashboard/organizer/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/errors/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/layouts/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/matches/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/app/Views/tickets/auth.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/config/app.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/config/database.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/config/mail.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/config/routes.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/public/.htaccess" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/public/assets/js.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/public/index.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../briaf/storage/uploads/upT.php" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../coachPro-v2" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../coachProv3.mdj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../code.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../renforcement" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../testVue/aiif.java" beforeDir="false" afterPath="$PROJECT_DIR$/../testVue/aiif.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 1,
+  "fromUser": false
+}]]></component>
+  <component name="ProjectId" id="3FBHKSk807zdo2vZ2Ne3advmYfu" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "onboarding.tips.debug.path": "C:/Users/ayoub/Desktop/IndustrialProcessManager 1/src/main/java/org/example/Main.java"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="3d1d9baf-b945-4b4f-8bf3-6738baa02b61" name="Changes" comment="" />
+      <created>1781541479843</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1781541479843</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/example/Main.java</url>
+          <line>13</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>
