@@ -9,7 +9,11 @@ import org.example.controller.AdminAtelierController;
 import org.example.controller.AdminDashboardController;
 import org.example.controller.AdminUserController;
 import org.example.controller.AuthController;
+import org.example.controller.ChefArticleController;
 import org.example.controller.ChefDashboardController;
+import org.example.controller.ChefEquipementController;
+import org.example.controller.ChefLotController;
+import org.example.controller.ChefOperationController;
 import org.example.repository.AtelierRepository;
 import org.example.repository.DashboardRepository;
 import org.example.repository.UserRepository;
@@ -49,7 +53,10 @@ public class Main {
         AdminAtelierController adminAtelierController = new AdminAtelierController(atelierService);
         AdminDashboardController adminDashboardController = new AdminDashboardController(dashboardService);
         ChefDashboardController chefDashboardController = new ChefDashboardController(chefDashboardService);
-        org.example.controller.ChefEquipementController chefEquipementController = new org.example.controller.ChefEquipementController();
+        ChefEquipementController chefEquipementController = new ChefEquipementController();
+        ChefOperationController chefOperationController = new ChefOperationController();
+        ChefLotController chefLotController = new ChefLotController();
+        ChefArticleController chefArticleController = new ChefArticleController();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/api/auth/login", authController);
@@ -58,13 +65,16 @@ public class Main {
         server.createContext("/api/admin/dashboard", adminDashboardController);
         server.createContext("/api/chef/dashboard", chefDashboardController);
         server.createContext("/api/chef/equipements", chefEquipementController);
+        server.createContext("/api/chef/operations", chefOperationController);
+        server.createContext("/api/chef/lots", chefLotController);
+        server.createContext("/api/chef/articles", chefArticleController);
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
 
         System.out.println("API demarree sur http://localhost:" + port);
         System.out.println("Endpoint : POST /api/auth/login");
         System.out.println("Admin : /api/admin/dashboard, /api/admin/users, /api/admin/ateliers");
-        System.out.println("Chef atelier : /api/chef/dashboard?atelierId=1");
+        System.out.println("Chef atelier : /api/chef/dashboard, /api/chef/equipements, /api/chef/operations, /api/chef/lots");
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0)));
     }
