@@ -624,6 +624,12 @@ const lotsConformes = computed(() => {
   return lots.value.filter((lot) => lot.statutQualite === 'CONFORME').length
 })
 
+const operationEntreeTotal = computed(() => {
+  return operationForm.value.entreeFlux.reduce((total, flux) => {
+    return total + (toSafeNumber(flux.mesureCapteur) || 0)
+  }, 0)
+})
+
 const activeMenu = computed(() => {
   if (activeTab.value === 'operation-details') {
     return { label: 'Details operation' }
@@ -1186,6 +1192,7 @@ watch(activeTab, (val) => {
                   <div>
                     <h3>Flux d'entree</h3>
                     <p>Ajoute toutes les matieres qui entrent dans cette operation.</p>
+                    <small>Total entree : {{ operationEntreeTotal }} t</small>
                   </div>
 
                   <button class="soft-button no-margin" type="button" @click="addEntreeFlux">
@@ -2196,6 +2203,18 @@ watch(activeTab, (val) => {
   margin-top: 4px;
   color: var(--text);
   font-size: 13px;
+}
+
+.form-section small {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 5px 9px;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 850;
+  background: var(--green-light);
+  border: 1px solid #b9e4ca;
+  border-radius: 999px;
 }
 
 .form-section-header {
