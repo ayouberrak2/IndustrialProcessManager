@@ -11,6 +11,7 @@ public class DatabaseMigration {
     public void run() {
         addAtelierIdToUtilisateur();
         addChefAtelierIdToAtelier();
+        addStatutToEquipement();
         attachOldUsersToFirstAtelier();
         attachFirstChefToFirstAtelier();
         cleanDuplicateChefAtelier();
@@ -74,6 +75,25 @@ public class DatabaseMigration {
             System.out.println("Migration chef_atelier_id : " + exception.getMessage());
         }
     }
+
+    private void addStatutToEquipement() {
+        try {
+            DatabaseConnection databaseConnection = DatabaseConnection.getInstance();
+
+            try (Connection connection = databaseConnection.getConnection()) {
+                if (columnExists(connection, "equipement", "statut_equipement")) {
+                    return;
+                }
+
+                try (Statement statement = connection.createStatement()) {
+                    statement.executeUpdate("ALTER TABLE equipement ADD COLUMN statut_equipement VARCHAR(50) NOT NULL DEFAULT 'OPERATIONNEL'");
+                }
+            }
+        } catch (SQLException exception) {
+            System.out.println("Migration statut equipement : " + exception.getMessage());
+        }
+    }
+
 
     private void attachFirstChefToFirstAtelier() {
         String sql = """

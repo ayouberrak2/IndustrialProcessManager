@@ -21,6 +21,7 @@ async function submitLogin() {
     localStorage.setItem('currentUser', JSON.stringify(user))
     if (user.role === 'ADMIN') router.push({ name: 'Admin' })
     else if (user.role === 'CHEF_ATELIER') router.push({ name: 'Chef' })
+    else if (user.role === 'TECHNICIEN_LABO') router.push({ name: 'Labo' })
     else router.push({ name: 'Login' })
   } catch (error) {
     errorMessage.value = error.message

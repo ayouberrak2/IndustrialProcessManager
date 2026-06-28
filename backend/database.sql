@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS equipement (
     tag_industriel VARCHAR(100) NOT NULL,
     type_equipement VARCHAR(100) NOT NULL,
     nom_equipement VARCHAR(100) NOT NULL,
+    statut_equipement VARCHAR(50) NOT NULL DEFAULT 'OPERATIONNEL',
     PRIMARY KEY (id),
     UNIQUE KEY uk_equipement_tag (tag_industriel),
     CONSTRAINT fk_equipement_atelier
@@ -224,8 +225,11 @@ SET chef_atelier_id = (
 )
 WHERE id = 1;
 
-INSERT IGNORE INTO equipement (id, atelier_id, tag_industriel, type_equipement, nom_equipement)
-VALUES (1, 1, 'EQ-001', 'Capteur', 'Capteur debit');
+INSERT IGNORE INTO equipement (id, atelier_id, tag_industriel, type_equipement, nom_equipement, statut_equipement)
+VALUES (1, 1, 'EQ-001', 'Capteur', 'Capteur debit', 'OPERATIONNEL');
+
+INSERT IGNORE INTO equipement (id, atelier_id, tag_industriel, type_equipement, nom_equipement, statut_equipement)
+VALUES (2, 1, 'EQ-002', 'Pompe', 'Pompe alimentation', 'EN_PANNE');
 
 INSERT IGNORE INTO article_matiere (id, nom_article, categorie, unite_standard, densite_standard)
 VALUES (1, 'Phosphate', 'Matiere premiere', 'Tonne', 1.50);

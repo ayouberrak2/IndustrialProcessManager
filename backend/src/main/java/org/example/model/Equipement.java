@@ -6,6 +6,7 @@ public class Equipement {
     private String tagIndustriel;
     private String typeEquipement;
     private String nomEquipement;
+    private String statutEquipement = "OPERATIONNEL";
 
     public Equipement() {
     }
@@ -40,5 +41,13 @@ public class Equipement {
 
     public void setNomEquipement(String nomEquipement) {
         this.nomEquipement = nomEquipement;
+    }
+
+    public String getStatutEquipement() {
+        return statutEquipement;
+    }
+
+    public void setStatutEquipement(String statutEquipement) {
+        this.statutEquipement = statutEquipement;
     }
 }

@@ -24,6 +24,16 @@ public class DashboardRepository {
         return countWithAtelier("SELECT COUNT(*) FROM equipement WHERE atelier_id = ?", atelierId);
     }
 
+    public int countEquipementsEnPanneByAtelier(int atelierId) {
+        String baseSql = "SELECT COUNT(*) FROM equipement WHERE UPPER(statut_equipement) = 'EN_PANNE'";
+
+        if (atelierId <= 0) {
+            return countSingle(baseSql);
+        }
+
+        return countWithAtelier(baseSql + " AND atelier_id = ?", atelierId);
+    }
+
     public int countOperations() {
         return countTable("operation_process");
     }
@@ -42,6 +52,33 @@ public class DashboardRepository {
                 """;
 
         return countWithAtelier(sql, atelierId);
+    }
+
+    public int countOperationsEnCoursByAtelier(int atelierId) {
+        String sqlWithoutAtelier = """
+                SELECT COUNT(*)
+                FROM operation_process op
+                WHERE op.date_fin IS NULL
+                   OR UPPER(op.statut_operation) NOT IN ('TERMINEE', 'TERMINE')
+                """;
+
+        String sqlWithAtelier = """
+                SELECT COUNT(DISTINCT op.id)
+                FROM operation_process op
+                JOIN operation_equipement oe ON oe.operation_process_id = op.id
+                JOIN equipement e ON e.id = oe.equipement_id
+                WHERE e.atelier_id = ?
+                  AND (
+                    op.date_fin IS NULL
+                    OR UPPER(op.statut_operation) NOT IN ('TERMINEE', 'TERMINE')
+                  )
+                """;
+
+        if (atelierId <= 0) {
+            return countSingle(sqlWithoutAtelier);
+        }
+
+        return countWithAtelier(sqlWithAtelier, atelierId);
     }
 
     public int countLots() {
@@ -63,6 +100,73 @@ public class DashboardRepository {
                 """;
 
         return countWithAtelier(sql, atelierId);
+    }
+
+    public int countLotsNonConformesByAtelier(int atelierId) {
+        String sqlWithoutAtelier = """
+                SELECT COUNT(*)
+                FROM lot_production lp
+                WHERE UPPER(lp.statut_qualite) = 'NON_CONFORME'
+                """;
+
+        String sqlWithAtelier = """
+                SELECT COUNT(DISTINCT lp.id)
+                FROM lot_production lp
+                JOIN operation_process op ON op.id = lp.operation_process_id
+                JOIN operation_equipement oe ON oe.operation_process_id = op.id
+                JOIN equipement e ON e.id = oe.equipement_id
+                WHERE e.atelier_id = ?
+                  AND UPPER(lp.statut_qualite) = 'NON_CONFORME'
+                """;
+
+        if (atelierId <= 0) {
+            return countSingle(sqlWithoutAtelier);
+        }
+
+        return countWithAtelier(sqlWithAtelier, atelierId);
+    }
+
+    public double sumFluxByAtelierAndType(int atelierId, String typeFlux) {
+        String sqlWithoutAtelier = """
+                SELECT COALESCE(SUM(fm.mesure_capteur), 0)
+                FROM flux_matiere fm
+                WHERE fm.type_flux = ?
+                """;
+
+        String sqlWithAtelier = """
+                SELECT COALESCE(SUM(fm.mesure_capteur), 0)
+                FROM flux_matiere fm
+                JOIN operation_process op ON op.id = fm.operation_process_id
+                JOIN operation_equipement oe ON oe.operation_process_id = op.id
+                JOIN equipement e ON e.id = oe.equipement_id
+                WHERE fm.type_flux = ?
+                  AND e.atelier_id = ?
+                """;
+
+        try {
+            DatabaseConnection databaseConnection = DatabaseConnection.getInstance();
+
+            try (Connection connection = databaseConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(
+                         atelierId > 0 ? sqlWithAtelier : sqlWithoutAtelier
+                 )) {
+
+                statement.setString(1, typeFlux);
+                if (atelierId > 0) {
+                    statement.setInt(2, atelierId);
+                }
+
+                try (ResultSet result = statement.executeQuery()) {
+                    if (result.next()) {
+                        return result.getDouble(1);
+                    }
+                }
+            }
+        } catch (SQLException exception) {
+            System.out.println("Erreur SQL dashboard sum flux : " + exception.getMessage());
+        }
+
+        return 0;
     }
 
     public List<RecentOperationDto> findRecentOperations() {
@@ -213,6 +317,11 @@ public class DashboardRepository {
 
     private int countTable(String tableName) {
         String sql = "SELECT COUNT(*) FROM " + tableName;
+
+        return countSingle(sql);
+    }
+
+    private int countSingle(String sql) {
 
         try {
             DatabaseConnection databaseConnection = DatabaseConnection.getInstance();

@@ -19,6 +19,7 @@ import {
   updateOperation,
   deleteOperation,
   getLots,
+  updateLotStatus,
   getArticles,
   createArticle,
   updateArticle,
@@ -44,6 +45,11 @@ const chefDashboard = ref({
   totalTechniciensLabo: 0,
   totalOperations: 0,
   totalLots: 0,
+  equipementsEnPanne: 0,
+  operationsEnCours: 0,
+  lotsNonConformes: 0,
+  totalFluxEntree: 0,
+  totalFluxSortie: 0,
   activeOperation: null,
   recentOperations: [],
 })
@@ -93,18 +99,21 @@ const equipements = ref([
     tagIndustriel: 'EQ-101',
     nomEquipement: 'Convoyeur alimentation',
     typeEquipement: 'Convoyeur',
+    statutEquipement: 'OPERATIONNEL',
   },
   {
     id: 2,
     tagIndustriel: 'EQ-204',
     nomEquipement: 'Broyeur principal',
     typeEquipement: 'Broyeur',
+    statutEquipement: 'OPERATIONNEL',
   },
   {
     id: 3,
     tagIndustriel: 'EQ-318',
     nomEquipement: 'Pompe acide',
     typeEquipement: 'Pompe',
+    statutEquipement: 'EN_PANNE',
   },
 ])
 
@@ -117,6 +126,7 @@ function emptyEquipement() {
     tagIndustriel: '',
     nomEquipement: '',
     typeEquipement: '',
+    statutEquipement: 'OPERATIONNEL',
   }
 }
 
@@ -151,9 +161,30 @@ async function saveEquipement() {
       equipements.value.unshift(created)
     }
     showEquipementModal.value = false
+    await loadChefDashboard()
   } catch (err) {
     console.error('saveEquipement', err)
     alert(err.message || 'Erreur')
+  }
+}
+
+async function toggleEquipementPanne(equipement) {
+  const nextStatut = isEquipementEnPanne(equipement) ? 'OPERATIONNEL' : 'EN_PANNE'
+  const oldStatut = equipement.statutEquipement
+
+  equipement.statutEquipement = nextStatut
+
+  try {
+    const updated = await updateEquipement(equipement.id, {
+      ...equipement,
+      statutEquipement: nextStatut,
+    })
+    Object.assign(equipement, updated)
+    await loadChefDashboard()
+  } catch (err) {
+    equipement.statutEquipement = oldStatut
+    console.error('toggleEquipementPanne', err)
+    alert(err.message || 'Erreur changement statut equipement')
   }
 }
 
@@ -492,6 +523,26 @@ function isPositiveNumber(value) {
   return numberValue !== null && numberValue > 0
 }
 
+function formatNumber(value) {
+  const numberValue = Number(value || 0)
+
+  if (!Number.isFinite(numberValue)) {
+    return '0'
+  }
+
+  return new Intl.NumberFormat('fr-FR', {
+    maximumFractionDigits: 2,
+  }).format(numberValue)
+}
+
+function isEquipementEnPanne(equipement) {
+  return equipement.statutEquipement === 'EN_PANNE'
+}
+
+function getEquipementStatutLabel(equipement) {
+  return isEquipementEnPanne(equipement) ? 'En panne' : 'Operationnel'
+}
+
 async function removeOperation(id) {
   if (!confirm('Supprimer cette operation ? Les lots lies seront aussi supprimes.')) return
 
@@ -510,6 +561,11 @@ async function removeOperation(id) {
 }
 
 const lots = ref([])
+const lotStatusSavingId = ref(null)
+const showLotAnalysesModal = ref(false)
+const selectedLotForAnalyses = ref(null)
+const selectedLotAnalyses = ref([])
+const lotAnalysesLoading = ref(false)
 const showArticleModal = ref(false)
 const articleForm = ref(emptyArticleForm())
 
@@ -530,6 +586,55 @@ async function loadLots() {
   } catch (err) {
     console.error('loadLots', err)
   }
+}
+
+async function changeLotStatus(lot, newStatus) {
+  const oldStatus = lot.statutQualite
+
+  if (oldStatus === newStatus) {
+    return
+  }
+
+  lotStatusSavingId.value = lot.id
+
+  try {
+    const updatedLot = await updateLotStatus(lot, newStatus)
+    Object.assign(lot, updatedLot)
+    await loadChefDashboard()
+  } catch (err) {
+    lot.statutQualite = oldStatus
+    console.error('changeLotStatus', err)
+    alert(err.message || 'Erreur changement statut lot')
+  } finally {
+    lotStatusSavingId.value = null
+  }
+}
+
+async function openLotAnalyses(lot) {
+  selectedLotForAnalyses.value = lot
+  selectedLotAnalyses.value = []
+  showLotAnalysesModal.value = true
+  lotAnalysesLoading.value = true
+
+  try {
+    const details = await getOperationDetails(lot.operationProcessId)
+    const analyses = details.analyses || []
+
+    selectedLotAnalyses.value = analyses.filter((analyse) => {
+      return Number(analyse.lotProductionId) === Number(lot.id)
+    })
+  } catch (err) {
+    console.error('openLotAnalyses', err)
+    alert(err.message || 'Erreur chargement analyses labo')
+  } finally {
+    lotAnalysesLoading.value = false
+  }
+}
+
+function closeLotAnalysesModal() {
+  showLotAnalysesModal.value = false
+  selectedLotForAnalyses.value = null
+  selectedLotAnalyses.value = []
 }
 
 async function loadArticles() {
@@ -602,11 +707,23 @@ async function removeArticle(id) {
 }
 
 const stats = computed(() => [
-  { label: 'Equipements', value: chefDashboard.value.totalEquipements },
-  { label: 'Techniciens labo', value: chefDashboard.value.totalTechniciensLabo },
-  { label: 'Operations', value: chefDashboard.value.totalOperations },
-  { label: 'Lots', value: chefDashboard.value.totalLots },
+  { label: 'Equipements en panne', value: chefDashboard.value.equipementsEnPanne, tone: 'danger', icon: '!' },
+  { label: 'Operations en cours', value: chefDashboard.value.operationsEnCours, tone: 'warning', icon: 'O' },
+  { label: 'Lots non conformes', value: chefDashboard.value.lotsNonConformes, tone: 'danger', icon: 'L' },
+  { label: 'Flux entree total', value: `${formatNumber(chefDashboard.value.totalFluxEntree)} t`, tone: 'success', icon: 'E' },
+  { label: 'Flux sortie total', value: `${formatNumber(chefDashboard.value.totalFluxSortie)} t`, tone: 'success', icon: 'S' },
+  { label: 'Total equipements', value: chefDashboard.value.totalEquipements, tone: 'neutral', icon: 'T' },
+  { label: 'Lots production', value: chefDashboard.value.totalLots, tone: 'neutral', icon: 'P' },
+  { label: 'Techniciens labo', value: chefDashboard.value.totalTechniciensLabo, tone: 'neutral', icon: 'N' },
 ])
+
+const equipementsEnPanne = computed(() => {
+  return equipements.value.filter(isEquipementEnPanne).length
+})
+
+const equipementsOperationnels = computed(() => {
+  return equipements.value.length - equipementsEnPanne.value
+})
 
 const operationsEnCours = computed(() => {
   return operations.value.filter((operation) => {
@@ -624,8 +741,40 @@ const lotsConformes = computed(() => {
   return lots.value.filter((lot) => lot.statutQualite === 'CONFORME').length
 })
 
+const lotsNonConformes = computed(() => {
+  return lots.value.filter((lot) => lot.statutQualite === 'NON_CONFORME').length
+})
+
+const tauxLotsConformes = computed(() => {
+  if (lots.value.length === 0) {
+    return '0%'
+  }
+
+  return `${Math.round((lotsConformes.value / lots.value.length) * 100)}%`
+})
+
 const operationEntreeTotal = computed(() => {
   return operationForm.value.entreeFlux.reduce((total, flux) => {
+    return total + (toSafeNumber(flux.mesureCapteur) || 0)
+  }, 0)
+})
+
+const operationFluxEntrees = computed(() => {
+  return operationDetails.value.flux.filter((flux) => flux.typeFlux === 'ENTREE')
+})
+
+const operationFluxSorties = computed(() => {
+  return operationDetails.value.flux.filter((flux) => flux.typeFlux === 'SORTIE')
+})
+
+const operationDetailsEntreeTotal = computed(() => {
+  return operationFluxEntrees.value.reduce((total, flux) => {
+    return total + (toSafeNumber(flux.mesureCapteur) || 0)
+  }, 0)
+})
+
+const operationDetailsSortieTotal = computed(() => {
+  return operationFluxSorties.value.reduce((total, flux) => {
     return total + (toSafeNumber(flux.mesureCapteur) || 0)
   }, 0)
 })
@@ -721,7 +870,7 @@ async function viewOperationDetails(operation) {
 function backToDashboard() {
   selectedOperation.value = null
   operationDetails.value = emptyOperationDetails()
-  activeTab.value = 'dashboard'
+  activeTab.value = 'operations'
 }
 
 async function loadChefDashboard() {
@@ -735,6 +884,11 @@ async function loadChefDashboard() {
       totalTechniciensLabo: data.totalTechniciensLabo || 0,
       totalOperations: data.totalOperations || 0,
       totalLots: data.totalLots || 0,
+      equipementsEnPanne: data.equipementsEnPanne || 0,
+      operationsEnCours: data.operationsEnCours || 0,
+      lotsNonConformes: data.lotsNonConformes || 0,
+      totalFluxEntree: data.totalFluxEntree || 0,
+      totalFluxSortie: data.totalFluxSortie || 0,
       activeOperation: data.activeOperation || null,
       recentOperations: data.recentOperations || [],
     }
@@ -751,6 +905,15 @@ async function loadChefDashboard() {
   } catch (error) {
     dashboardError.value = error.message
   }
+}
+
+async function refreshDashboardData() {
+  await Promise.all([
+    loadChefDashboard(),
+    loadEquipements(),
+    loadOperations(),
+    loadLots(),
+  ])
 }
 
 function buildCalendar() {
@@ -879,25 +1042,46 @@ watch(activeTab, (val) => {
         </div>
 
         <div class="topbar-actions">
-          <button class="refresh-button" type="button" @click="loadChefDashboard">
+          <button class="primary-button no-margin topbar-button" type="button" @click="refreshDashboardData">
             Actualiser
           </button>
-          <span class="role-pill">{{ user.role }}</span>
+          <span class="primary-button no-margin topbar-button chef-role-pill">
+            {{ user.role }}
+          </span>
         </div>
       </header>
 
       <p v-if="dashboardError" class="alert-error">{{ dashboardError }}</p>
 
-      <section v-if="activeTab === 'dashboard'" class="panel">
+      <section v-if="activeTab === 'dashboard'" class="panel dashboard-panel">
+        <div class="dashboard-welcome">
+          <div>
+            <p class="eyebrow">Pilotage atelier</p>
+            <h2>Bonjour {{ user.username }}</h2>
+            <p>
+              Suivi clair de {{ atelierName }} avec les operations, les lots,
+              les techniciens labo et les equipements essentiels.
+            </p>
+          </div>
+
+          <div class="dashboard-date-card">
+            <span>Mois affiche</span>
+            <strong>{{ calendarTitle }}</strong>
+          </div>
+        </div>
+
         <div class="stats-grid">
-          <article v-for="item in stats" :key="item.label" class="stat-card">
-            <span>{{ item.label }}</span>
+          <article v-for="item in stats" :key="item.label" class="stat-card" :class="`stat-card-${item.tone}`">
+            <div class="stat-card-head">
+              <span>{{ item.label }}</span>
+              <small>{{ item.icon }}</small>
+            </div>
             <strong>{{ item.value }}</strong>
           </article>
         </div>
 
         <div class="dashboard-grid">
-          <article class="info-card">
+          <article class="info-card dashboard-info-card">
             <p class="eyebrow">Atelier</p>
             <h2>{{ atelierName }}</h2>
             <p>
@@ -906,11 +1090,14 @@ watch(activeTab, (val) => {
             </p>
           </article>
 
-          <article class="info-card">
+          <article class="info-card dashboard-info-card active-operation-card">
             <p class="eyebrow">Operation active</p>
             <template v-if="activeOperation">
               <h2>{{ activeOperation.numOrdreFab }}</h2>
               <p>{{ activeOperation.typeOperation }} - {{ activeOperation.statutOperation }}</p>
+              <button class="details-button" type="button" @click="viewOperationDetails(activeOperation)">
+                Voir details
+              </button>
             </template>
             <template v-else>
               <h2>Aucune operation</h2>
@@ -941,7 +1128,7 @@ watch(activeTab, (val) => {
           </article>
         </div>
 
-        <div class="table-card">
+        <div class="table-card dashboard-table-card">
           <div class="section-title">
             <div>
               <p class="eyebrow">Suivi rapide</p>
@@ -1020,7 +1207,13 @@ watch(activeTab, (val) => {
                 <input v-model.trim="equipementForm.typeEquipement" required placeholder="Broyeur" />
               </div>
 
-              <!-- etat removed: model no longer contains etat field -->
+              <div>
+                <label>Statut</label>
+                <select v-model="equipementForm.statutEquipement" required>
+                  <option value="OPERATIONNEL">Operationnel</option>
+                  <option value="EN_PANNE">En panne</option>
+                </select>
+              </div>
             </div>
 
             <div class="modal-actions">
@@ -1162,7 +1355,7 @@ watch(activeTab, (val) => {
                 <select v-model.number="operationForm.equipementId" required>
                   <option value="">Choisir un equipement</option>
                   <option v-for="equipement in equipements" :key="equipement.id" :value="equipement.id">
-                    {{ equipement.tagIndustriel }} - {{ equipement.nomEquipement }}
+                    {{ equipement.tagIndustriel }} - {{ equipement.nomEquipement }}{{ isEquipementEnPanne(equipement) ? ' (en panne)' : '' }}
                   </option>
                 </select>
               </div>
@@ -1272,204 +1465,290 @@ watch(activeTab, (val) => {
         </div>
       </div>
 
-      <section v-if="activeTab === 'operation-details'" class="panel">
-        <div class="details-header">
-          <div>
-            <p class="eyebrow">Operation process</p>
-            <h2>Details operation</h2>
-            <p>Informations principales de l'operation selectionnee.</p>
+      <section v-if="activeTab === 'operation-details'" class="panel operation-details-panel">
+        <div class="operation-hero">
+          <div class="operation-hero-main">
+            <p class="eyebrow">Fiche operation</p>
+            <h2>{{ selectedOperation ? selectedOperation.numOrdreFab : 'Details operation' }}</h2>
+            <p v-if="selectedOperation">
+              Informations organisees pour suivre le statut, les flux, le bilan,
+              les lots et les analyses labo sans afficher les identifiants internes.
+            </p>
+            <p v-else>
+              Selectionnez une operation depuis la liste pour voir ses details.
+            </p>
           </div>
 
-          <button class="details-button" type="button" @click="backToDashboard">
-            Retour dashboard
-          </button>
+          <div class="operation-hero-actions">
+            <span v-if="selectedOperation" class="operation-status-pill">
+              {{ selectedOperation.statutOperation || 'EN_COURS' }}
+            </span>
+            <button class="details-button" type="button" @click="backToDashboard">
+              Retour operations
+            </button>
+          </div>
         </div>
 
-        <div v-if="selectedOperation" class="details-grid">
-          <article>
-            <span>Ordre fabrication</span>
-            <strong>{{ selectedOperation.numOrdreFab }}</strong>
-          </article>
-          <article>
-            <span>Type operation</span>
-            <strong>{{ selectedOperation.typeOperation }}</strong>
-          </article>
-          <article>
-            <span>Statut</span>
-            <strong>{{ selectedOperation.statutOperation }}</strong>
-          </article>
-          <article>
-            <span>Date debut</span>
-            <strong>{{ selectedOperation.dateDebut }}</strong>
-          </article>
-          <article>
-            <span>Date fin</span>
-            <strong>{{ selectedOperation.dateFin || 'Non terminee' }}</strong>
-          </article>
-          <article>
-            <span>Atelier</span>
-            <strong>{{ atelierName }}</strong>
-          </article>
-          <article>
-            <span>Equipement</span>
-            <strong>{{ selectedOperation.equipementName || 'Non precise' }}</strong>
-          </article>
-          <article>
-            <span>Duree estimee</span>
-            <strong>{{ selectedOperation.dureeEstimee || '-' }} min</strong>
-          </article>
-          <article>
-            <span>Operateur</span>
-            <strong>{{ selectedOperation.operateur || '-' }}</strong>
-          </article>
-        </div>
-
-        <div v-if="selectedOperation" class="operation-details-sections">
-          <article class="table-card">
-            <div class="section-title">
+        <template v-if="selectedOperation">
+          <div class="operation-quick-steps">
+            <article class="operation-step is-done">
+              <span>01</span>
               <div>
-                <p class="eyebrow">Flux matiere</p>
-                <h2>Entrees et sorties</h2>
+                <strong>Operation demarree</strong>
+                <p>{{ selectedOperation.dateDebut }}</p>
               </div>
-            </div>
+            </article>
 
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Type flux</th>
-                    <th>Article</th>
-                    <th>Mesure capteur</th>
-                    <th>Mesure diametre</th>
-                    <th>Date mesure</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr v-if="operationDetails.flux.length === 0">
-                    <td class="empty-cell" colspan="5">Aucun flux trouve pour cette operation.</td>
-                  </tr>
-
-                  <tr v-for="flux in operationDetails.flux" :key="flux.id">
-                    <td><span class="mini-pill">{{ flux.typeFlux }}</span></td>
-                    <td>{{ flux.nomArticle }}</td>
-                    <td>{{ flux.mesureCapteur }} t</td>
-                    <td>{{ flux.mesureDiametre }}</td>
-                    <td>{{ flux.dateMesure }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="table-card">
-            <div class="section-title">
+            <article class="operation-step is-done">
+              <span>02</span>
               <div>
-                <p class="eyebrow">Bilan massique</p>
-                <h2>Calcul automatique</h2>
+                <strong>Flux d'entree</strong>
+                <p>{{ operationFluxEntrees.length }} ligne(s) saisie(s)</p>
               </div>
-            </div>
+            </article>
 
-            <div v-if="operationDetails.bilanMassique" class="details-grid compact-grid">
-              <article>
-                <span>Total entrees</span>
-                <strong>{{ operationDetails.bilanMassique.totalEntreesT }} t</strong>
-              </article>
-              <article>
-                <span>Total sorties</span>
-                <strong>{{ operationDetails.bilanMassique.totalSortiesT }} t</strong>
-              </article>
-              <article>
-                <span>Ecart pertes</span>
-                <strong>{{ operationDetails.bilanMassique.ecartPertesT }} t</strong>
-              </article>
-              <article>
-                <span>Rendement</span>
-                <strong>{{ operationDetails.bilanMassique.rendementVal }} %</strong>
-              </article>
-              <article>
-                <span>Date calcul</span>
-                <strong>{{ operationDetails.bilanMassique.dateCalcul }}</strong>
-              </article>
-            </div>
-
-            <p v-else class="empty-details">
-              Le bilan sera calcule quand le flux de sortie sera saisi.
-            </p>
-          </article>
-
-          <article class="table-card">
-            <div class="section-title">
+            <article class="operation-step" :class="{ 'is-done': operationFluxSorties.length > 0 }">
+              <span>03</span>
               <div>
-                <p class="eyebrow">Production</p>
-                <h2>Lots de production</h2>
+                <strong>Flux de sortie</strong>
+                <p>{{ operationFluxSorties.length > 0 ? 'Sortie saisie' : 'En attente' }}</p>
               </div>
-            </div>
+            </article>
 
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Lot</th>
-                    <th>Article</th>
-                    <th>Date</th>
-                    <th>Statut qualite</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr v-if="operationDetails.lots.length === 0">
-                    <td class="empty-cell" colspan="4">Aucun lot genere pour cette operation.</td>
-                  </tr>
-
-                  <tr v-for="lot in operationDetails.lots" :key="lot.id">
-                    <td class="strong-cell">LOT-{{ lot.id }}</td>
-                    <td>{{ lot.nomArticle }}</td>
-                    <td>{{ lot.date }}</td>
-                    <td><span class="mini-pill">{{ lot.statutQualite }}</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="table-card">
-            <div class="section-title">
+            <article class="operation-step" :class="{ 'is-done': operationDetails.bilanMassique }">
+              <span>04</span>
               <div>
-                <p class="eyebrow">Laboratoire</p>
-                <h2>Analyses labo</h2>
+                <strong>Bilan massique</strong>
+                <p>{{ operationDetails.bilanMassique ? 'Calcule' : 'En attente' }}</p>
               </div>
-            </div>
+            </article>
+          </div>
 
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Lot</th>
-                    <th>P2O5</th>
-                    <th>Cadmium ppm</th>
-                    <th>Solides suspendu</th>
-                    <th>Date analyse</th>
-                  </tr>
-                </thead>
+          <div class="operation-summary-grid">
+            <article>
+              <span>Type operation</span>
+              <strong>{{ selectedOperation.typeOperation }}</strong>
+            </article>
+            <article>
+              <span>Equipement</span>
+              <strong>{{ selectedOperation.equipementName || 'Non precise' }}</strong>
+            </article>
+            <article>
+              <span>Operateur</span>
+              <strong>{{ selectedOperation.operateur || '-' }}</strong>
+            </article>
+            <article>
+              <span>Total entree</span>
+              <strong>{{ formatNumber(operationDetailsEntreeTotal) }} t</strong>
+            </article>
+            <article>
+              <span>Total sortie</span>
+              <strong>{{ formatNumber(operationDetailsSortieTotal) }} t</strong>
+            </article>
+            <article>
+              <span>Date fin</span>
+              <strong>{{ selectedOperation.dateFin || 'Non terminee' }}</strong>
+            </article>
+            <article>
+              <span>Duree estimee</span>
+              <strong>{{ selectedOperation.dureeEstimee || '-' }} min</strong>
+            </article>
+            <article>
+              <span>Atelier</span>
+              <strong>{{ atelierName }}</strong>
+            </article>
+          </div>
 
-                <tbody>
-                  <tr v-if="operationDetails.analyses.length === 0">
-                    <td class="empty-cell" colspan="5">Aucune analyse labo pour cette operation.</td>
-                  </tr>
+          <div class="operation-details-layout">
+            <article class="detail-card detail-card-large">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Flux matiere</p>
+                  <h2>Entree et sortie separees</h2>
+                </div>
+                <span class="mini-pill">{{ operationDetails.flux.length }} flux</span>
+              </div>
 
-                  <tr v-for="analyse in operationDetails.analyses" :key="analyse.id">
-                    <td class="strong-cell">LOT-{{ analyse.lotProductionId }}</td>
-                    <td>{{ analyse.tauxP2O5 }}</td>
-                    <td>{{ analyse.tauxCadmiumPpm }}</td>
-                    <td>{{ analyse.solidesSuspendu }}</td>
-                    <td>{{ analyse.dateAnalyse }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </div>
+              <div class="flux-split-grid">
+                <div class="flux-panel">
+                  <div class="flux-panel-title">
+                    <strong>Flux d'entree</strong>
+                    <span>{{ operationFluxEntrees.length }} ligne(s)</span>
+                  </div>
+
+                  <div class="table-wrapper detail-table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Article</th>
+                          <th>Mesure capteur</th>
+                          <th>Diametre</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-if="operationFluxEntrees.length === 0">
+                          <td class="empty-cell" colspan="4">Aucun flux d'entree saisi.</td>
+                        </tr>
+
+                        <tr v-for="flux in operationFluxEntrees" :key="flux.id">
+                          <td class="strong-cell">{{ flux.nomArticle }}</td>
+                          <td>{{ flux.mesureCapteur }} t</td>
+                          <td>{{ flux.mesureDiametre || '-' }}</td>
+                          <td>{{ flux.dateMesure }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="flux-panel">
+                  <div class="flux-panel-title">
+                    <strong>Flux de sortie</strong>
+                    <span>{{ operationFluxSorties.length }} ligne(s)</span>
+                  </div>
+
+                  <div class="table-wrapper detail-table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Article</th>
+                          <th>Mesure capteur</th>
+                          <th>Diametre</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-if="operationFluxSorties.length === 0">
+                          <td class="empty-cell" colspan="4">La sortie sera visible apres la fin d'operation.</td>
+                        </tr>
+
+                        <tr v-for="flux in operationFluxSorties" :key="flux.id">
+                          <td class="strong-cell">{{ flux.nomArticle }}</td>
+                          <td>{{ flux.mesureCapteur }} t</td>
+                          <td>{{ flux.mesureDiametre || '-' }}</td>
+                          <td>{{ flux.dateMesure }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="detail-card">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Bilan massique</p>
+                  <h2>Resume calcul</h2>
+                </div>
+              </div>
+
+              <div v-if="operationDetails.bilanMassique" class="bilan-grid">
+                <article class="bilan-metric main-metric">
+                  <span>Rendement</span>
+                  <strong>{{ operationDetails.bilanMassique.rendementVal }} %</strong>
+                </article>
+                <article class="bilan-metric">
+                  <span>Total entrees</span>
+                  <strong>{{ operationDetails.bilanMassique.totalEntreesT }} t</strong>
+                </article>
+                <article class="bilan-metric">
+                  <span>Total sorties</span>
+                  <strong>{{ operationDetails.bilanMassique.totalSortiesT }} t</strong>
+                </article>
+                <article class="bilan-metric">
+                  <span>Ecart pertes</span>
+                  <strong>{{ operationDetails.bilanMassique.ecartPertesT }} t</strong>
+                </article>
+                <article class="bilan-metric">
+                  <span>Date calcul</span>
+                  <strong>{{ operationDetails.bilanMassique.dateCalcul }}</strong>
+                </article>
+              </div>
+
+              <p v-else class="operation-empty-note">
+                Le bilan sera calcule automatiquement quand le flux de sortie sera saisi.
+              </p>
+            </article>
+
+            <article class="detail-card">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Production</p>
+                  <h2>Lots generes</h2>
+                </div>
+                <span class="mini-pill">{{ operationDetails.lots.length }} lot(s)</span>
+              </div>
+
+              <div class="table-wrapper detail-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Lot</th>
+                      <th>Article</th>
+                      <th>Date</th>
+                      <th>Qualite</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr v-if="operationDetails.lots.length === 0">
+                      <td class="empty-cell" colspan="4">Aucun lot genere pour cette operation.</td>
+                    </tr>
+
+                    <tr v-for="lot in operationDetails.lots" :key="lot.id">
+                      <td class="strong-cell">Lot production</td>
+                      <td>{{ lot.nomArticle }}</td>
+                      <td>{{ lot.date }}</td>
+                      <td><span class="mini-pill">{{ lot.statutQualite }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="detail-card">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Laboratoire</p>
+                  <h2>Analyses liees</h2>
+                </div>
+                <span class="mini-pill">{{ operationDetails.analyses.length }} analyse(s)</span>
+              </div>
+
+              <div class="table-wrapper detail-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Lot</th>
+                      <th>P2O5</th>
+                      <th>Cadmium ppm</th>
+                      <th>Solides</th>
+                      <th>Date analyse</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr v-if="operationDetails.analyses.length === 0">
+                      <td class="empty-cell" colspan="5">Aucune analyse labo pour cette operation.</td>
+                    </tr>
+
+                    <tr v-for="analyse in operationDetails.analyses" :key="analyse.id">
+                      <td class="strong-cell">Lot analyse</td>
+                      <td>{{ analyse.tauxP2O5 }}</td>
+                      <td>{{ analyse.tauxCadmiumPpm }}</td>
+                      <td>{{ analyse.solidesSuspendu }}</td>
+                      <td>{{ analyse.dateAnalyse }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </template>
 
         <p v-else class="empty-details">
           Aucune operation selectionnee.
@@ -1488,6 +1767,7 @@ watch(activeTab, (val) => {
           </div>
 
           <button class="primary-button" type="button" @click="openCreateEquipement">
+            <span class="button-plus">+</span>
             Ajouter equipement
           </button>
         </div>
@@ -1499,13 +1779,13 @@ watch(activeTab, (val) => {
           </article>
 
           <article>
-            <span>Atelier</span>
-            <strong>{{ atelierName }}</strong>
+            <span>Operationnels</span>
+            <strong>{{ equipementsOperationnels }}</strong>
           </article>
 
           <article>
-            <span>Suivi</span>
-            <strong>Chef atelier</strong>
+            <span>En panne</span>
+            <strong>{{ equipementsEnPanne }}</strong>
           </article>
         </div>
 
@@ -1524,18 +1804,23 @@ watch(activeTab, (val) => {
                   <th>Tag industriel</th>
                   <th>Nom equipement</th>
                   <th>Type</th>
+                  <th>Statut</th>
                   <th>Action</th>
                 </tr>
               </thead>
 
               <tbody>
                 <tr v-if="equipements.length === 0">
-                  <td class="empty-cell" colspan="4">
+                  <td class="empty-cell" colspan="5">
                     Aucun equipement trouve pour cet atelier.
                   </td>
                 </tr>
 
-                <tr v-for="equipement in equipements" :key="equipement.id">
+                <tr
+                  v-for="equipement in equipements"
+                  :key="equipement.id"
+                  :class="{ 'equipement-row-alert': isEquipementEnPanne(equipement) }"
+                >
                   <td>
                     <span class="equipement-code">
                       {{ equipement.tagIndustriel }}
@@ -1545,7 +1830,7 @@ watch(activeTab, (val) => {
                   <td>
                     <div class="equipement-name">
                       <strong>{{ equipement.nomEquipement }}</strong>
-                      <small>ID : {{ equipement.id }}</small>
+                      <small>{{ getEquipementStatutLabel(equipement) }}</small>
                     </div>
                   </td>
 
@@ -1553,7 +1838,24 @@ watch(activeTab, (val) => {
                     <span class="type-pill">{{ equipement.typeEquipement }}</span>
                   </td>
 
+                  <td>
+                    <span
+                      class="equipement-status-pill"
+                      :class="{ 'is-panne': isEquipementEnPanne(equipement) }"
+                    >
+                      {{ getEquipementStatutLabel(equipement) }}
+                    </span>
+                  </td>
+
                   <td class="actions">
+                    <button
+                      class="action-button status-action-button"
+                      :class="{ 'danger-button': !isEquipementEnPanne(equipement), 'restore-button': isEquipementEnPanne(equipement) }"
+                      type="button"
+                      @click="toggleEquipementPanne(equipement)"
+                    >
+                      {{ isEquipementEnPanne(equipement) ? 'Operationnel' : 'En panne' }}
+                    </button>
                     <button
                       class="action-button"
                       type="button"
@@ -1576,20 +1878,25 @@ watch(activeTab, (val) => {
         </div>
       </section>
 
-      <section v-if="activeTab === 'labo'" class="panel labo-panel">
-        <div class="section-title labo-header">
-          <div>
+      <section v-if="activeTab === 'labo'" class="panel crud-page labo-panel">
+        <div class="page-hero page-hero-labo">
+          <div class="page-hero-text">
             <p class="eyebrow">Laboratoire</p>
             <h2>Techniciens labo</h2>
-            <p>CRUD simple des users avec role technicien labo pour {{ atelierName }}.</p>
+            <p>
+              Gestion des techniciens affectes a {{ atelierName }}.
+              Chaque technicien garde un acces simple pour le suivi labo.
+            </p>
           </div>
 
-          <button class="primary-button no-margin" type="button" @click="openCreateTechnicien">
-            Ajouter technicien
-          </button>
+          <div class="page-hero-actions">
+            <button class="primary-button no-margin" type="button" @click="openCreateTechnicien">
+              Ajouter technicien
+            </button>
+          </div>
         </div>
 
-        <div class="labo-metrics">
+        <div class="labo-metrics crud-metrics page-metrics">
           <article>
             <span>Total techniciens</span>
             <strong>{{ techniciensLabo.length }}</strong>
@@ -1606,7 +1913,7 @@ watch(activeTab, (val) => {
           </article>
         </div>
 
-        <article class="table-card labo-table-card">
+        <article class="table-card labo-table-card modern-table-card">
           <div class="section-title">
             <div>
               <p class="eyebrow">Users laboratoire</p>
@@ -1639,9 +1946,14 @@ watch(activeTab, (val) => {
 
                 <tr v-for="technicien in techniciensLabo" :key="technicien.id">
                   <td>
-                    <div class="technicien-name">
-                      <strong>{{ technicien.username }}</strong>
-                      <small>ID : {{ technicien.id }}</small>
+                    <div class="person-cell">
+                      <span class="person-avatar">
+                        {{ technicien.username ? technicien.username.charAt(0).toUpperCase() : 'T' }}
+                      </span>
+                      <div class="technicien-name">
+                        <strong>{{ technicien.username }}</strong>
+                        <small>Technicien atelier</small>
+                      </div>
                     </div>
                   </td>
                   <td>{{ technicien.email }}</td>
@@ -1670,20 +1982,25 @@ watch(activeTab, (val) => {
         </article>
       </section>
 
-      <section v-if="activeTab === 'articles'" class="panel crud-panel">
-        <div class="section-title">
-          <div>
+      <section v-if="activeTab === 'articles'" class="panel crud-page articles-panel">
+        <div class="page-hero page-hero-articles">
+          <div class="page-hero-text">
             <p class="eyebrow">Matiere</p>
             <h2>Articles matiere</h2>
-            <p>Gestion des articles utilises dans les flux d'entree, de sortie et les lots.</p>
+            <p>
+              Referentiel des matieres utilisees dans les flux d'entree,
+              les flux de sortie et les lots de production.
+            </p>
           </div>
 
-          <button class="primary-button no-margin" type="button" @click="openCreateArticle">
-            Ajouter article
-          </button>
+          <div class="page-hero-actions">
+            <button class="primary-button no-margin" type="button" @click="openCreateArticle">
+              Ajouter article
+            </button>
+          </div>
         </div>
 
-        <div class="labo-metrics crud-metrics">
+        <div class="labo-metrics crud-metrics page-metrics">
           <article>
             <span>Total articles</span>
             <strong>{{ articles.length }}</strong>
@@ -1700,7 +2017,7 @@ watch(activeTab, (val) => {
           </article>
         </div>
 
-        <article class="table-card labo-table-card">
+        <article class="table-card labo-table-card modern-table-card">
           <div class="section-title">
             <div>
               <p class="eyebrow">Referentiel</p>
@@ -1733,9 +2050,12 @@ watch(activeTab, (val) => {
 
                 <tr v-for="article in articles" :key="article.id">
                   <td>
-                    <div class="technicien-name">
-                      <strong>{{ article.nomArticle }}</strong>
-                      <small>ID : {{ article.id }}</small>
+                    <div class="material-cell">
+                      <span class="material-dot"></span>
+                      <div class="technicien-name">
+                        <strong>{{ article.nomArticle }}</strong>
+                        <small>{{ article.categorie }}</small>
+                      </div>
                     </div>
                   </td>
                   <td>{{ article.categorie }}</td>
@@ -1760,20 +2080,25 @@ watch(activeTab, (val) => {
         </article>
       </section>
 
-      <section v-if="activeTab === 'operations'" class="panel crud-panel">
-        <div class="section-title">
-          <div>
+      <section v-if="activeTab === 'operations'" class="panel crud-page operations-panel">
+        <div class="page-hero page-hero-operations">
+          <div class="page-hero-text">
             <p class="eyebrow">Process</p>
             <h2>Operations process</h2>
-            <p>CRUD simple des operations de fabrication de {{ atelierName }}.</p>
+            <p>
+              Creation, suivi et cloture des operations de fabrication de
+              {{ atelierName }} avec les flux matiere.
+            </p>
           </div>
 
-          <button class="primary-button no-margin" type="button" @click="openCreateOperation">
-            Ajouter operation
-          </button>
+          <div class="page-hero-actions">
+            <button class="primary-button no-margin" type="button" @click="openCreateOperation">
+              Ajouter operation
+            </button>
+          </div>
         </div>
 
-        <div class="labo-metrics crud-metrics">
+        <div class="labo-metrics crud-metrics page-metrics">
           <article>
             <span>Total operations</span>
             <strong>{{ operations.length }}</strong>
@@ -1790,7 +2115,7 @@ watch(activeTab, (val) => {
           </article>
         </div>
 
-        <article class="table-card labo-table-card">
+        <article class="table-card labo-table-card modern-table-card">
           <div class="section-title">
             <div>
               <p class="eyebrow">Liste process</p>
@@ -1824,12 +2149,17 @@ watch(activeTab, (val) => {
                 </tr>
 
                 <tr v-for="operation in operations" :key="operation.id">
-                  <td class="strong-cell">{{ operation.numOrdreFab }}</td>
+                  <td>
+                    <div class="operation-code-cell">
+                      <strong>{{ operation.numOrdreFab }}</strong>
+                      <small>Operation process</small>
+                    </div>
+                  </td>
                   <td>{{ operation.typeOperation }}</td>
                   <td>{{ operation.equipementName || 'Non precise' }}</td>
                   <td>{{ operation.dateDebut }}</td>
                   <td>{{ operation.dateFin || 'Non terminee' }}</td>
-                  <td><span class="mini-pill">{{ operation.statutOperation }}</span></td>
+                  <td><span class="mini-pill operation-status-mini">{{ operation.statutOperation }}</span></td>
                   <td class="actions">
                     <button class="action-button" type="button" @click="viewOperationDetails(operation)">
                       Details
@@ -1852,16 +2182,25 @@ watch(activeTab, (val) => {
         </article>
       </section>
 
-      <section v-if="activeTab === 'lots'" class="panel crud-panel">
-        <div class="section-title">
-          <div>
+      <section v-if="activeTab === 'lots'" class="panel crud-page lots-panel">
+        <div class="page-hero page-hero-lots">
+          <div class="page-hero-text">
             <p class="eyebrow">Production</p>
             <h2>Lots de production</h2>
-            <p>Affichage des lots generes automatiquement apres la sortie operation.</p>
+            <p>
+              Suivi qualite des lots generes automatiquement apres la sortie
+              operation. Le chef atelier peut marquer chaque lot conforme ou non conforme.
+            </p>
+          </div>
+
+          <div class="page-hero-actions">
+            <button class="soft-button no-margin" type="button" @click="loadLots">
+              Actualiser
+            </button>
           </div>
         </div>
 
-        <div class="labo-metrics crud-metrics">
+        <div class="labo-metrics crud-metrics page-metrics lot-metrics">
           <article>
             <span>Total lots</span>
             <strong>{{ lots.length }}</strong>
@@ -1873,21 +2212,22 @@ watch(activeTab, (val) => {
           </article>
 
           <article>
-            <span>Articles</span>
-            <strong>{{ articles.length }}</strong>
+            <span>Non conformes</span>
+            <strong>{{ lotsNonConformes }}</strong>
+          </article>
+
+          <article>
+            <span>Taux conformite</span>
+            <strong>{{ tauxLotsConformes }}</strong>
           </article>
         </div>
 
-        <article class="table-card labo-table-card">
+        <article class="table-card labo-table-card modern-table-card lots-table-card">
           <div class="section-title">
             <div>
               <p class="eyebrow">Suivi production</p>
-              <h2>Liste des lots</h2>
+              <h2>Controle qualite des lots</h2>
             </div>
-
-            <button class="soft-button no-margin" type="button" @click="loadLots">
-              Actualiser
-            </button>
           </div>
 
           <div class="table-wrapper">
@@ -1910,19 +2250,73 @@ watch(activeTab, (val) => {
                   </td>
                 </tr>
 
-                <tr v-for="lot in lots" :key="lot.id">
-                  <td class="strong-cell">LOT-{{ lot.id }}</td>
-                  <td>{{ lot.numOrdreFab }}</td>
-                  <td>{{ lot.nomArticle }}</td>
+                <tr
+                  v-for="lot in lots"
+                  :key="lot.id"
+                  :class="{ 'lot-row-alert': lot.statutQualite === 'NON_CONFORME' }"
+                >
+                  <td>
+                    <div class="lot-code-cell">
+                      <strong>Lot production</strong>
+                      <small>{{ lot.statutQualite === 'CONFORME' ? 'Controle OK' : 'A verifier' }}</small>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="operation-code-cell">
+                      <strong>{{ lot.numOrdreFab }}</strong>
+                      <small>Operation source</small>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="material-cell">
+                      <span class="material-dot"></span>
+                      <div class="technicien-name">
+                        <strong>{{ lot.nomArticle }}</strong>
+                        <small>Article produit</small>
+                      </div>
+                    </div>
+                  </td>
                   <td>{{ lot.date }}</td>
-                  <td><span class="mini-pill">{{ lot.statutQualite }}</span></td>
+                  <td>
+                    <div
+                      class="lot-status-control"
+                      :class="{
+                        'is-conforme': lot.statutQualite === 'CONFORME',
+                        'is-non-conforme': lot.statutQualite === 'NON_CONFORME'
+                      }"
+                    >
+                      <div class="lot-status-buttons">
+                        <button
+                          class="lot-status-button conforme"
+                          :class="{ active: lot.statutQualite === 'CONFORME' }"
+                          :disabled="lotStatusSavingId === lot.id"
+                          type="button"
+                          @click="changeLotStatus(lot, 'CONFORME')"
+                        >
+                          Conforme
+                        </button>
+                        <button
+                          class="lot-status-button non-conforme"
+                          :class="{ active: lot.statutQualite === 'NON_CONFORME' }"
+                          :disabled="lotStatusSavingId === lot.id"
+                          type="button"
+                          @click="changeLotStatus(lot, 'NON_CONFORME')"
+                        >
+                          Non conforme
+                        </button>
+                      </div>
+                      <small>
+                        {{ lotStatusSavingId === lot.id ? 'Sauvegarde...' : 'Statut qualite' }}
+                      </small>
+                    </div>
+                  </td>
                   <td class="actions">
                     <button
                       class="action-button"
                       type="button"
-                      @click="viewOperationDetails({ id: lot.operationProcessId })"
+                      @click="openLotAnalyses(lot)"
                     >
-                      Voir details
+                      Voir analyses labo
                     </button>
                   </td>
                 </tr>
@@ -1931,6 +2325,62 @@ watch(activeTab, (val) => {
           </div>
         </article>
       </section>
+
+      <div v-if="showLotAnalysesModal" class="modal-backdrop">
+        <div class="modal-card lot-analyses-modal">
+          <div class="modal-header">
+            <div>
+              <p class="eyebrow">Analyses laboratoire</p>
+              <h2>
+                Analyses du lot
+              </h2>
+              <p v-if="selectedLotForAnalyses">
+                {{ selectedLotForAnalyses.numOrdreFab }} -
+                {{ selectedLotForAnalyses.nomArticle }}
+              </p>
+            </div>
+            <button class="modal-close" type="button" @click="closeLotAnalysesModal">
+              Fermer
+            </button>
+          </div>
+
+          <div class="lot-analyses-body">
+            <p v-if="lotAnalysesLoading" class="empty-details">
+              Chargement des analyses labo...
+            </p>
+
+            <div v-else class="table-wrapper detail-table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lot</th>
+                    <th>P2O5</th>
+                    <th>Cadmium ppm</th>
+                    <th>Solides suspendu</th>
+                    <th>Date analyse</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr v-if="selectedLotAnalyses.length === 0">
+                    <td class="empty-cell" colspan="5">
+                      Aucune analyse labo trouvee pour ce lot.
+                    </td>
+                  </tr>
+
+                  <tr v-for="analyse in selectedLotAnalyses" :key="analyse.id">
+                    <td class="strong-cell">Lot analyse</td>
+                    <td>{{ analyse.tauxP2O5 }}</td>
+                    <td>{{ analyse.tauxCadmiumPpm }}</td>
+                    <td>{{ analyse.solidesSuspendu }}</td>
+                    <td>{{ analyse.dateAnalyse }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </template>
@@ -2283,20 +2733,26 @@ watch(activeTab, (val) => {
   gap: 10px;
 }
 
-.refresh-button {
-  padding: 8px 11px;
-  color: var(--green-dark);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  background: var(--green-light);
-  border: 1px solid #b9e4ca;
-  border-radius: 8px;
-  cursor: pointer;
+.topbar-button {
+  min-height: 40px;
 }
 
-.refresh-button:hover {
-  background: #dff0e7;
+.chef-role-pill {
+  cursor: default;
+}
+
+.button-plus {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  margin-right: 7px;
+  place-items: center;
+  color: var(--green);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1;
+  background: #fff;
+  border-radius: 7px;
 }
 
 .alert-error {
@@ -2334,6 +2790,8 @@ watch(activeTab, (val) => {
 .role-pill,
 .mini-pill {
   display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 5px 9px;
   color: var(--green-dark);
   font-size: 12px;
@@ -2348,9 +2806,123 @@ watch(activeTab, (val) => {
   padding: 18px;
 }
 
+.dashboard-panel,
+.crud-page {
+  padding: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #f7fbf8 0%, #f2f6f4 100%);
+  border-color: #dce6df;
+  box-shadow: 0 16px 36px rgb(16 24 40 / 5%);
+}
+
+.dashboard-welcome,
+.page-hero {
+  display: flex;
+  padding: 26px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 85% 0%, rgb(18 183 106 / 14%), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 98%), rgb(236 248 242 / 96%)),
+    #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-welcome h2,
+.page-hero h2 {
+  margin-top: 5px;
+  color: var(--title);
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.dashboard-welcome p:last-child,
+.page-hero p:last-child {
+  max-width: 680px;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dashboard-date-card {
+  min-width: 185px;
+  padding: 14px 16px;
+  text-align: right;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 26px rgb(16 24 40 / 5%);
+}
+
+.dashboard-date-card span,
+.dashboard-date-card strong {
+  display: block;
+}
+
+.dashboard-date-card span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.dashboard-date-card strong {
+  margin-top: 6px;
+  color: var(--green-dark);
+  font-size: 17px;
+}
+
+.page-hero {
+  background:
+    radial-gradient(circle at top right, rgb(15 122 63 / 12%), transparent 36%),
+    linear-gradient(135deg, #fff, #f3faf6);
+}
+
+.page-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-metrics,
+.dashboard-panel .stats-grid {
+  margin-top: 0;
+  padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.lot-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-panel .dashboard-grid {
+  margin-top: 0;
+  padding: 0 18px 18px;
+}
+
+.dashboard-info-card {
+  min-height: 160px;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgb(16 24 40 / 5%);
+}
+
+.active-operation-card .details-button {
+  margin-top: 14px;
+}
+
+.dashboard-table-card {
+  margin: 0 18px 18px;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgb(16 24 40 / 5%);
+}
+
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
   gap: 12px;
 }
 
@@ -2364,8 +2936,75 @@ watch(activeTab, (val) => {
 }
 
 .stat-card {
+  min-height: 118px;
   padding: 16px;
-  border-left: 4px solid var(--green);
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 12px 26px rgb(16 24 40 / 5%);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--green);
+}
+
+.stat-card-danger::before {
+  background: #d92d20;
+}
+
+.stat-card-danger strong {
+  color: #b42318;
+}
+
+.stat-card-success::before {
+  background: #12b76a;
+}
+
+.stat-card-warning::before {
+  background: #f79009;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgb(16 24 40 / 8%);
+}
+
+.stat-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stat-card-head small {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  place-items: center;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 950;
+  background: #eef9f2;
+  border: 1px solid #c7ead4;
+  border-radius: 9px;
+}
+
+.stat-card-danger .stat-card-head small {
+  color: #b42318;
+  background: #fff1f0;
+  border-color: #fecdca;
+}
+
+.stat-card-warning .stat-card-head small {
+  color: #b54708;
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 
 .stat-card span,
@@ -2380,7 +3019,7 @@ watch(activeTab, (val) => {
 }
 
 .stat-card strong {
-  margin-top: 6px;
+  margin-top: 18px;
   color: var(--title);
   font-size: 30px;
   line-height: 1;
@@ -2400,11 +3039,16 @@ watch(activeTab, (val) => {
   margin-top: 16px;
 }
 
+.labo-metrics.lot-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .labo-metrics article {
   padding: 15px;
-  background: #f8faf9;
+  background: #fff;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgb(16 24 40 / 4%);
 }
 
 .labo-metrics span,
@@ -2430,6 +3074,26 @@ watch(activeTab, (val) => {
   margin-top: 16px;
 }
 
+.crud-page .labo-table-card {
+  margin: 0 18px 18px;
+}
+
+.modern-table-card {
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 14px 32px rgb(16 24 40 / 5%);
+}
+
+.modern-table-card .table-wrapper,
+.dashboard-table-card .table-wrapper {
+  border-radius: 12px;
+}
+
+.modern-table-card tbody tr,
+.dashboard-table-card tbody tr {
+  transition: background 0.16s ease;
+}
+
 .technicien-name {
   display: grid;
   gap: 4px;
@@ -2443,6 +3107,156 @@ watch(activeTab, (val) => {
 .technicien-name small {
   color: var(--text);
   font-size: 12px;
+  font-weight: 750;
+}
+
+.person-cell,
+.material-cell,
+.operation-code-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.person-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  background: var(--green);
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgb(15 122 63 / 18%);
+}
+
+.material-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  background: var(--green);
+  border: 3px solid #dff3e8;
+  border-radius: 999px;
+}
+
+.operation-code-cell {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.operation-code-cell strong {
+  color: var(--title);
+  font-size: 14px;
+}
+
+.operation-code-cell small {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.operation-status-mini {
+  background: #eef9f2;
+}
+
+.lots-table-card table {
+  min-width: 900px;
+}
+
+.lot-code-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.lot-code-cell strong {
+  color: var(--title);
+  font-size: 14px;
+}
+
+.lot-code-cell small {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lot-row-alert {
+  background: #fffafa;
+}
+
+.lot-row-alert:hover {
+  background: #fff5f5;
+}
+
+.lot-status-control {
+  display: grid;
+  width: 230px;
+  gap: 5px;
+}
+
+.lot-status-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  background: #f2f5f3;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.lot-status-button {
+  min-height: 32px;
+  padding: 0 10px;
+  color: #667085;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.lot-status-button.conforme.active {
+  color: var(--green-dark);
+  background: #e8f7ee;
+  border-color: #b9e4ca;
+  box-shadow: 0 8px 18px rgb(15 122 63 / 12%);
+}
+
+.lot-status-button.non-conforme.active {
+  color: #9f1239;
+  background: #fff1f3;
+  border-color: #fecdd3;
+  box-shadow: 0 8px 18px rgb(159 18 57 / 10%);
+}
+
+.lot-status-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.lot-status-control small {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.lot-analyses-modal {
+  width: min(780px, 100%);
+}
+
+.lot-analyses-body {
+  padding: 18px;
+}
+
+.lot-analyses-modal .modal-header p:last-child {
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 13px;
   font-weight: 750;
 }
 
@@ -2612,17 +3426,21 @@ tbody tr:hover {
 .equipements-panel {
   padding: 0;
   overflow: hidden;
-  background: #f8faf9;
+  background:
+    linear-gradient(180deg, #f8fbf9 0%, #f2f6f4 100%);
+  border-color: #dce6df;
+  box-shadow: 0 16px 36px rgb(16 24 40 / 5%);
 }
 
 .equipements-hero {
   display: flex;
-  padding: 22px;
+  padding: 26px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   background:
-    linear-gradient(135deg, rgb(255 255 255 / 96%), rgb(235 247 241 / 92%)),
+    radial-gradient(circle at 90% 0%, rgb(15 122 63 / 14%), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 98%), rgb(232 247 239 / 95%)),
     #fff;
   border-bottom: 1px solid var(--border);
 }
@@ -2646,14 +3464,31 @@ tbody tr:hover {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
 }
 
 .equipements-metrics article {
-  padding: 15px;
-  background: #fff;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, #fff, #f8fbf9);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 10px 24px rgb(15 23 42 / 4%);
+  border-radius: 14px;
+  box-shadow: 0 12px 26px rgb(15 23 42 / 5%);
+}
+
+.equipements-metrics article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--green);
+}
+
+.equipements-metrics article:last-child::before {
+  background: #d92d20;
 }
 
 .equipements-metrics span,
@@ -2677,10 +3512,13 @@ tbody tr:hover {
 
 .equipement-table-card {
   margin: 0 18px 18px;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 14px 32px rgb(16 24 40 / 5%);
 }
 
 .equipement-table-wrapper table {
-  min-width: 780px;
+  min-width: 900px;
 }
 
 .equipement-code,
@@ -2698,6 +3536,7 @@ tbody tr:hover {
   font-weight: 900;
   background: var(--green-light);
   border: 1px solid #b9e4ca;
+  box-shadow: 0 8px 18px rgb(15 122 63 / 10%);
 }
 
 .equipement-name {
@@ -2725,59 +3564,355 @@ tbody tr:hover {
   border: 1px solid #e4e7ec;
 }
 
-.details-header {
+.equipement-row-alert {
+  background: #fffafa;
+}
+
+.equipement-row-alert:hover {
+  background: #fff5f5;
+}
+
+.equipement-status-pill {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  align-items: center;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+  background: #e8f7ee;
+  border: 1px solid #b9e4ca;
+  border-radius: 999px;
+}
+
+.equipement-status-pill.is-panne {
+  color: #b42318;
+  background: #fff1f0;
+  border-color: #fecdca;
+}
+
+.status-action-button {
+  min-width: 112px;
+  justify-content: center;
+}
+
+.restore-button {
+  color: var(--green-dark);
+  background: #eef9f2;
+  border-color: #b9e4ca;
+}
+
+.restore-button:hover {
+  background: #dff3e8;
+}
+
+.operation-details-panel {
+  padding: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #f7fbf8 0%, #eef4f1 100%);
+  border-color: #dce6df;
+  box-shadow: 0 16px 36px rgb(16 24 40 / 5%);
+}
+
+.operation-hero {
+  display: flex;
+  padding: 28px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 86% 8%, rgb(255 255 255 / 20%), transparent 30%),
+    linear-gradient(135deg, rgb(7 88 45 / 97%), rgb(15 122 63 / 88%)),
+    linear-gradient(120deg, #123d2a, #0f7a3f);
+  border-bottom: 1px solid rgb(255 255 255 / 14%);
+}
+
+.operation-hero-main {
+  max-width: 720px;
+}
+
+.operation-hero .eyebrow {
+  color: #cbf5d9;
+}
+
+.operation-hero h2 {
+  margin-top: 6px;
+  color: #fff;
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+.operation-hero p:last-child {
+  margin-top: 8px;
+  color: rgb(255 255 255 / 78%);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.operation-hero-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
-.details-header p:last-child {
-  margin-top: 6px;
-  color: var(--text);
-  font-size: 14px;
+.operation-status-pill {
+  display: inline-flex;
+  padding: 8px 12px;
+  color: #eafff1;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgb(255 255 255 / 13%);
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
 }
 
-.details-grid {
+.operation-hero .details-button {
+  color: #0a4f2b;
+  background: #fff;
+  border-color: #fff;
+}
+
+.operation-hero .details-button:hover {
+  background: #edf8f1;
+}
+
+.operation-quick-steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
 }
 
-.operation-details-sections {
-  display: grid;
-  gap: 16px;
-  margin-top: 18px;
-}
-
-.compact-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.details-grid article {
-  padding: 16px;
-  background: #f8faf9;
+.operation-step {
+  display: flex;
+  min-height: 86px;
+  padding: 14px;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(135deg, #fff, #f8fbf9);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgb(16 24 40 / 4%);
 }
 
-.details-grid span,
-.details-grid strong {
+.operation-step span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 900;
+  background: #eef2f0;
+  border-radius: 999px;
+}
+
+.operation-step strong,
+.operation-step p {
   display: block;
 }
 
-.details-grid span {
+.operation-step strong {
+  color: var(--title);
+  font-size: 14px;
+}
+
+.operation-step p {
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.operation-step.is-done {
+  background: linear-gradient(135deg, #f0fbf4, #fff);
+  border-color: #c7ead4;
+}
+
+.operation-step.is-done span {
+  color: #fff;
+  background: var(--green);
+}
+
+.operation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.operation-summary-grid article {
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff, #f8fbf9);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgb(16 24 40 / 4%);
+}
+
+.operation-summary-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--green);
+}
+
+.operation-summary-grid span,
+.operation-summary-grid strong {
+  display: block;
+}
+
+.operation-summary-grid span {
   color: var(--text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
-.details-grid strong {
-  margin-top: 7px;
+.operation-summary-grid strong {
+  margin-top: 8px;
   color: var(--title);
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.operation-details-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 18px;
+}
+
+.detail-card {
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 14px 32px rgb(16 24 40 / 6%);
+}
+
+.detail-card-large {
+  grid-column: 1 / -1;
+}
+
+.flux-split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.flux-panel {
+  padding: 14px;
+  background: #f8faf9;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.flux-panel:first-child {
+  background: #f3fbf6;
+  border-color: #c7ead4;
+}
+
+.flux-panel:last-child {
+  background: #f8fafc;
+}
+
+.flux-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flux-panel-title strong {
+  color: var(--title);
+  font-size: 15px;
+}
+
+.flux-panel-title span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.detail-table-wrapper {
+  background: #fff;
+}
+
+.detail-table-wrapper th {
+  background: #f6faf8;
+}
+
+.detail-table-wrapper table {
+  min-width: 560px;
+}
+
+.bilan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bilan-metric {
+  padding: 15px;
+  background: #f8faf9;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.bilan-metric.main-metric {
+  grid-column: 1 / -1;
+  background: #eef9f2;
+  border-color: #c7ead4;
+}
+
+.bilan-metric span,
+.bilan-metric strong {
+  display: block;
+}
+
+.bilan-metric span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.bilan-metric strong {
+  margin-top: 8px;
+  color: var(--title);
+  font-size: 18px;
+}
+
+.bilan-metric.main-metric strong {
+  color: var(--green-dark);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.operation-empty-note {
+  margin-top: 16px;
+  padding: 18px;
+  color: var(--text);
+  font-weight: 750;
+  line-height: 1.5;
+  background: #f8faf9;
+  border: 1px dashed #cbd5d0;
+  border-radius: 14px;
 }
 
 .actions {
@@ -2885,8 +4020,18 @@ tbody tr:hover {
   .stats-grid,
   .dashboard-grid,
   .labo-metrics,
-  .details-grid {
+  .operation-summary-grid,
+  .operation-details-layout,
+  .operation-quick-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .labo-metrics.lot-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flux-split-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2903,14 +4048,84 @@ tbody tr:hover {
   .stats-grid,
   .dashboard-grid,
   .labo-metrics,
-  .details-grid {
+  .operation-summary-grid,
+  .operation-details-layout,
+  .operation-quick-steps,
+  .bilan-grid {
     grid-template-columns: 1fr;
   }
 
-  .details-header,
+  .labo-metrics.lot-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-hero,
   .section-title {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .operation-hero {
+    padding: 18px;
+  }
+
+  .operation-hero h2 {
+    font-size: 24px;
+  }
+
+  .operation-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .operation-hero .details-button {
+    width: 100%;
+  }
+
+  .operation-quick-steps,
+  .operation-summary-grid,
+  .operation-details-layout {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .dashboard-welcome,
+  .page-hero {
+    padding: 18px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-welcome h2,
+  .page-hero h2 {
+    font-size: 24px;
+  }
+
+  .dashboard-date-card,
+  .page-hero-actions,
+  .page-hero .primary-button {
+    width: 100%;
+  }
+
+  .dashboard-date-card {
+    text-align: left;
+  }
+
+  .dashboard-panel .stats-grid,
+  .dashboard-panel .dashboard-grid,
+  .page-metrics {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .dashboard-table-card,
+  .crud-page .labo-table-card {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+
+  .detail-card {
+    padding: 14px;
   }
 
   .form-section-header {

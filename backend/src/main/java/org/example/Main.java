@@ -14,6 +14,7 @@ import org.example.controller.ChefDashboardController;
 import org.example.controller.ChefEquipementController;
 import org.example.controller.ChefLotController;
 import org.example.controller.ChefOperationController;
+import org.example.controller.TechnicienLaboController;
 import org.example.repository.AtelierRepository;
 import org.example.repository.DashboardRepository;
 import org.example.repository.UserRepository;
@@ -57,6 +58,7 @@ public class Main {
         ChefOperationController chefOperationController = new ChefOperationController();
         ChefLotController chefLotController = new ChefLotController();
         ChefArticleController chefArticleController = new ChefArticleController();
+        TechnicienLaboController technicienLaboController = new TechnicienLaboController();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/api/auth/login", authController);
@@ -68,6 +70,7 @@ public class Main {
         server.createContext("/api/chef/operations", chefOperationController);
         server.createContext("/api/chef/lots", chefLotController);
         server.createContext("/api/chef/articles", chefArticleController);
+        server.createContext("/api/labo", technicienLaboController);
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
 
@@ -75,6 +78,7 @@ public class Main {
         System.out.println("Endpoint : POST /api/auth/login");
         System.out.println("Admin : /api/admin/dashboard, /api/admin/users, /api/admin/ateliers");
         System.out.println("Chef atelier : /api/chef/dashboard, /api/chef/equipements, /api/chef/operations, /api/chef/lots");
+        System.out.println("Technicien labo : /api/labo/operations, /api/labo/analyses");
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0)));
     }

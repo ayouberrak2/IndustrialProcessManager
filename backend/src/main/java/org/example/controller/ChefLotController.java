@@ -144,7 +144,11 @@ public class ChefLotController implements HttpHandler {
                 && lot.getArticleMatiereId() != null
                 && lot.getArticleMatiereId() > 0
                 && !isBlank(lot.getDate())
-                && !isBlank(lot.getStatutQualite());
+                && isValidStatus(lot.getStatutQualite());
+    }
+
+    private boolean isValidStatus(String status) {
+        return "CONFORME".equals(status) || "NON_CONFORME".equals(status);
     }
 
     private Integer getAtelierId(HttpExchange exchange) {

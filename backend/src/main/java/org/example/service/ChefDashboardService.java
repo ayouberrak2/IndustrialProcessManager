@@ -24,6 +24,11 @@ public class ChefDashboardService {
         dashboard.setTotalTechniciensLabo(userRepository.countByRoleAndAtelier("TECHNICIEN_LABO", atelierId));
         dashboard.setTotalOperations(dashboardRepository.countOperationsByAtelier(atelierId));
         dashboard.setTotalLots(dashboardRepository.countLotsByAtelier(atelierId));
+        dashboard.setEquipementsEnPanne(dashboardRepository.countEquipementsEnPanneByAtelier(atelierId));
+        dashboard.setOperationsEnCours(dashboardRepository.countOperationsEnCoursByAtelier(atelierId));
+        dashboard.setLotsNonConformes(dashboardRepository.countLotsNonConformesByAtelier(atelierId));
+        dashboard.setTotalFluxEntree(dashboardRepository.sumFluxByAtelierAndType(atelierId, "ENTREE"));
+        dashboard.setTotalFluxSortie(dashboardRepository.sumFluxByAtelierAndType(atelierId, "SORTIE"));
         dashboard.setActiveOperation(dashboardRepository.findActiveOperationByAtelier(atelierId));
         dashboard.setRecentOperations(dashboardRepository.findRecentOperationsByAtelier(atelierId));
 

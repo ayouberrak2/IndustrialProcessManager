@@ -560,14 +560,14 @@ watch(activeTab, (val) => {
                   <td>
                     <div class="cell-detail">
                       <strong>{{ item.username }}</strong>
-                      <small>ID utilisateur : {{ item.id }}</small>
+                      <small>Utilisateur systeme</small>
                     </div>
                   </td>
                   <td><span class="mini-pill">{{ item.role }}</span></td>
                   <td>
                     <div class="cell-detail">
                       <strong>{{ item.atelierName || 'Aucun atelier' }}</strong>
-                      <small>{{ item.atelierId ? 'Atelier ID : ' + item.atelierId : 'Non affecte' }}</small>
+                      <small>{{ item.atelierId ? 'Affecte a un atelier' : 'Non affecte' }}</small>
                     </div>
                   </td>
                   <td>{{ item.email }}</td>

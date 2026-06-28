@@ -2,11 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
 import ChefAtelierDashboard from '../views/ChefAtelierDashboard.vue'
+import TechnicienLaboDashboard from '../views/TechnicienLaboDashboard.vue'
 
 const routes = [
   { path: '/', name: 'Login', component: LoginView },
   { path: '/admin', name: 'Admin', component: AdminDashboard, meta: { requiresAuth: true, role: 'ADMIN' } },
   { path: '/chef', name: 'Chef', component: ChefAtelierDashboard, meta: { requiresAuth: true, role: 'CHEF_ATELIER' } },
+  { path: '/labo', name: 'Labo', component: TechnicienLaboDashboard, meta: { requiresAuth: true, role: 'TECHNICIEN_LABO' } },
 ]
 
 const router = createRouter({
@@ -24,6 +26,7 @@ router.beforeEach((to, from, next) => {
       // redirect to appropriate dashboard if role mismatch
       if (user.role === 'ADMIN') return next({ name: 'Admin' })
       if (user.role === 'CHEF_ATELIER') return next({ name: 'Chef' })
+      if (user.role === 'TECHNICIEN_LABO') return next({ name: 'Labo' })
       return next({ name: 'Login' })
     }
   }
@@ -32,6 +35,7 @@ router.beforeEach((to, from, next) => {
   if (to.name === 'Login' && user) {
     if (user.role === 'ADMIN') return next({ name: 'Admin' })
     if (user.role === 'CHEF_ATELIER') return next({ name: 'Chef' })
+    if (user.role === 'TECHNICIEN_LABO') return next({ name: 'Labo' })
   }
 
   next()

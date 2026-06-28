@@ -180,6 +180,23 @@ export function getLots(atelierId) {
   return request(`/lots?atelierId=${id}`)
 }
 
+export async function updateLotStatus(lot, statutQualite) {
+  const response = await fetch(`${API_BASE_URL}/lots/${lot.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      operationProcessId: lot.operationProcessId,
+      articleMatiereId: lot.articleMatiereId,
+      date: lot.date,
+      statutQualite,
+    }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.message || 'Impossible de modifier statut lot')
+  return data
+}
+
 export function getArticles() {
   return request('/articles')
 }

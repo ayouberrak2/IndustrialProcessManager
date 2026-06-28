@@ -98,6 +98,7 @@ public class ChefEquipementController implements HttpHandler {
         e.setTagIndustriel((String) body.getOrDefault("tagIndustriel", ""));
         e.setTypeEquipement((String) body.getOrDefault("typeEquipement", ""));
         e.setNomEquipement((String) body.getOrDefault("nomEquipement", ""));
+        e.setStatutEquipement((String) body.getOrDefault("statutEquipement", "OPERATIONNEL"));
 
         Integer atelierId = null;
         Object aobj = body.get("atelierId");
@@ -124,6 +125,7 @@ public class ChefEquipementController implements HttpHandler {
         e.setTagIndustriel((String) body.getOrDefault("tagIndustriel", ""));
         e.setTypeEquipement((String) body.getOrDefault("typeEquipement", ""));
         e.setNomEquipement((String) body.getOrDefault("nomEquipement", ""));
+        e.setStatutEquipement((String) body.getOrDefault("statutEquipement", "OPERATIONNEL"));
 
         Equipement updated = repository.update(id, e);
         if (updated == null) {
